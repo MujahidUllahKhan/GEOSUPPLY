@@ -14,7 +14,6 @@ pragma solidity ^0.8.20;
 ///         address and DRC vote details are recorded immutably.
 ///
 /// @author Mujahid Ullah Khan Afridi, NMSU Industrial Engineering
-///         Paper: GEOSUPPLY — IEEE Access (under review)
 ///         Repository: https://github.com/MujahidUllahKhan/GEOSUPPLY
 contract ComplianceAudit {
 
