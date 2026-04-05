@@ -20,7 +20,6 @@ import "./IGOM.sol";
 ///            (not termination) with first-priority reinstatement rights
 ///
 /// @author Mujahid Ullah Khan Afridi, NMSU Industrial Engineering
-///         Paper: GEOSUPPLY — IEEE Access (under review)
 ///         Repository: https://github.com/MujahidUllahKhan/GEOSUPPLY
 contract ASAP {
 
