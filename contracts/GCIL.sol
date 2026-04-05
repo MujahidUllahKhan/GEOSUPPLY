@@ -147,7 +147,7 @@ contract GCIL {
         (IGOM.ZoneStatus status, bytes32 evHash) =
             gom.checkZone(route, block.timestamp);
         require(status == IGOM.ZoneStatus.FORCE_MAJEURE,
-                "GCIL: route not under FORCE_MAJEURE — cannot flag exclusion");
+                "GCIL: route not under FORCE_MAJEURE - cannot flag exclusion");
 
         uint256 fmPeriodEnd = gom.getResolutionDate(route);
 
