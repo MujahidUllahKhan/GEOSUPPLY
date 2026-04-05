@@ -6,7 +6,6 @@
 >
 > **Author:** Mujahid Ullah Khan Afridi, Department of Industrial Engineering, New Mexico State University (mujahida@nmsu.edu)
 >
-> **Target Journal:** *IEEE Access* (under review)
 >
 > **License:** MIT
 
@@ -132,7 +131,7 @@ If you use this code in your research, please cite:
 M. U. K. Afridi, "GEOSUPPLY: When 'Code is Law' Breaks Down — A Critical 
 Review of Blockchain-Enabled Supply Chain Smart Contract Failures Under 
 Geopolitical Force Majeure and a Human-in-the-Loop Governance Framework 
-for Resilient Global Trade," IEEE Access, under review, 2026.
+for Resilient Global Trade," under review, 2026.
 ```
 
 ---
