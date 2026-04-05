@@ -23,7 +23,6 @@ import "./IGOM.sol";
 ///         percentile points triggers a HumanReviewRequired event.
 ///
 /// @author Mujahid Ullah Khan Afridi, NMSU Industrial Engineering
-///         Paper: GEOSUPPLY — IEEE Access (under review)
 ///         Repository: https://github.com/MujahidUllahKhan/GEOSUPPLY
 contract GCIL {
 
