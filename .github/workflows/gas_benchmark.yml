@@ -37,12 +37,12 @@ jobs:
           echo "=========================================="
           npx hardhat test test/test_gas_benchmark.js
 
-      - name: Save gas report
-        if: always()
-        run: |
-          mkdir -p gas-report
-          npx hardhat test test/test_gas_benchmark.js 2>&1 | tee gas-report/gas_results.txt
-          echo "Run date: $(date)" >> gas-report/gas_results.txt
+      #- name: Save gas report
+      #  if: always()
+      #  run: |
+       #   mkdir -p gas-report
+        #  npx hardhat test test/test_gas_benchmark.js 2>&1 | tee gas-report/gas_results.txt
+       #   echo "Run date: $(date)" >> gas-report/gas_results.txt
 
       - name: Upload gas report artifact
         uses: actions/upload-artifact@v4
