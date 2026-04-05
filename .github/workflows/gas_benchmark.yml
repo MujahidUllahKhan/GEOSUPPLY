@@ -25,15 +25,13 @@ jobs:
       - name: Compile contracts
         run: npx hardhat compile
 
-      - name: Run gas benchmark and capture output
+      - name: Run gas benchmark and save results
         run: |
           mkdir -p gas-report
-          npx hardhat test test/test_gas_benchmark.js \
-            --reporter spec 2>&1 | tee gas-report/gas_results.txt || true
+          npx hardhat test test/test_gas_benchmark.js 2>&1 | tee gas-report/gas_results.txt || true
           echo "---" >> gas-report/gas_results.txt
           echo "Run date: $(date)" >> gas-report/gas_results.txt
           echo "Solidity 0.8.20 | Hardhat EVM | Optimizer: 200 runs" >> gas-report/gas_results.txt
-          cat gas-report/gas_results.txt
 
       - name: Upload gas report
         uses: actions/upload-artifact@v4
@@ -41,4 +39,4 @@ jobs:
         with:
           name: gas-benchmark-results
           path: gas-report/gas_results.txt
-          retention-days: 30
+          retention-days: 90
