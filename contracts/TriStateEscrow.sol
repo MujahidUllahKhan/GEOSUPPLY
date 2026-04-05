@@ -12,7 +12,6 @@ import "./IGOM.sol";
 ///         DRC rulings require genuine 3-of-5 multi-signature approval.
 ///         All state transitions are immutably recorded on-chain.
 /// @author Mujahid Ullah Khan Afridi, NMSU Industrial Engineering
-///         Paper: GEOSUPPLY — IEEE Access (under review)
 ///         Repository: https://github.com/MujahidUllahKhan/GEOSUPPLY
 contract TriStateEscrow {
 
