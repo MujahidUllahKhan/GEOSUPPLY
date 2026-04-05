@@ -21,7 +21,6 @@ import "./IGOM.sol";
 ///         - reserveBalance tracks: deposited + premiums - committed - paid claims
 ///
 /// @author Mujahid Ullah Khan Afridi, NMSU Industrial Engineering
-///         Paper: GEOSUPPLY — IEEE Access (under review)
 ///         Repository: https://github.com/MujahidUllahKhan/GEOSUPPLY
 contract GeoRiskInsurance {
 
