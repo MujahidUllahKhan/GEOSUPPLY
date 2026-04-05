@@ -8,7 +8,6 @@ import "./IGOM.sol";
 ///         Allows test scripts to set zone status without real oracle infra.
 /// @dev    NEVER deploy to mainnet. For local Hardhat/Ganache testing only.
 /// @author Mujahid Ullah Khan Afridi, NMSU Industrial Engineering
-///         Paper: GEOSUPPLY — IEEE Access (under review)
 ///         Repository: https://github.com/MujahidUllahKhan/GEOSUPPLY
 contract MockGOM is IGOM {
 
