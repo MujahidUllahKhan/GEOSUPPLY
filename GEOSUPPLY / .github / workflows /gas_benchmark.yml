@@ -1,0 +1,54 @@
+name: GEOSUPPLY Gas Benchmark
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  gas-benchmark:
+    name: Run Gas Measurements
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Compile contracts
+        run: npx hardhat compile
+
+      - name: Run correctness tests
+        run: npx hardhat test test/test_geosupply.js
+
+      - name: Run gas benchmark
+        run: |
+          echo "=========================================="
+          echo "  GEOSUPPLY GAS BENCHMARK — TABLE III"
+          echo "  Solidity 0.8.20 | Hardhat EVM"
+          echo "  Gas ref: 15 Gwei | ETH price: $3000"
+          echo "=========================================="
+          npx hardhat test test/test_gas_benchmark.js
+
+      - name: Save gas report
+        if: always()
+        run: |
+          mkdir -p gas-report
+          npx hardhat test test/test_gas_benchmark.js 2>&1 | tee gas-report/gas_results.txt
+          echo "Run date: $(date)" >> gas-report/gas_results.txt
+
+      - name: Upload gas report artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gas-benchmark-results
+          path: gas-report/gas_results.txt
+          retention-days: 30
