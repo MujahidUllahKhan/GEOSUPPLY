@@ -13,7 +13,6 @@ pragma solidity ^0.8.20;
 ///         A zone is designated FORCE_MAJEURE only when >= 3 of 5
 ///         sources independently confirm the event.
 /// @author Mujahid Ullah Khan Afridi, NMSU Industrial Engineering
-///         Paper: GEOSUPPLY — IEEE Access (under review)
 ///         Repository: https://github.com/MujahidUllahKhan/GEOSUPPLY
 interface IGOM {
 
