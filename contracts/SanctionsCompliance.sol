@@ -18,7 +18,6 @@ pragma solidity ^0.8.20;
 ///           from a parameter that could be passed incorrectly).
 ///
 /// @author Mujahid Ullah Khan Afridi, NMSU Industrial Engineering
-///         Paper: GEOSUPPLY — IEEE Access (under review)
 ///         Repository: https://github.com/MujahidUllahKhan/GEOSUPPLY
 contract SanctionsCompliance {
 
