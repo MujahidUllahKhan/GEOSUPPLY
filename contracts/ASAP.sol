@@ -141,7 +141,7 @@ contract ASAP {
         require(alternativeSupplier != address(0), "ASAP: zero alternative supplier");
         require(primarySupplier     != alternativeSupplier, "ASAP: same supplier");
         require(alternativeRankInML >= 1 && alternativeRankInML <= 5,
-                "ASAP: rank must be 1–5");
+                "ASAP: rank must be 1-5");
 
         // Verify route is under FM (GOM confirmation required per protocol)
         (IGOM.ZoneStatus status, bytes32 evHash) =
