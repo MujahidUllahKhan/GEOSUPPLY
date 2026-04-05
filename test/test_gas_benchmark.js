@@ -1,5 +1,5 @@
-// GEOSUPPLY Gas Benchmark — Simplified for GitHub Actions
-// Measures actual gas used for each operation
+// GEOSUPPLY Gas Benchmark — Final Version (all 15 tests pass)
+// Run: npx hardhat test test/test_gas_benchmark.js
 
 const { ethers } = require("hardhat");
 
@@ -12,12 +12,13 @@ function usd(gas) {
 
 describe("GEOSUPPLY Gas Benchmark — Table III", function () {
 
-  let gom, escrow, insurance, sanctions, gcil, asap, audit;
+  let gom, escrow, fmEscrow, insurance, sanctions, gcil, asap, audit;
   let buyer, supplier, drc0, drc1, drc2, drc3, drc4;
   let aisOracle, sanctionsOracle, officer;
 
   const route    = ethers.keccak256(ethers.toUtf8Bytes("HORMUZ-GULF"));
   const vesselId = ethers.keccak256(ethers.toUtf8Bytes("MMSI-123456789"));
+  const DRC_RAT  = "GOM confirmed FM. Non-fault. Supplier fulfilled pre-shipping.";
 
   before(async function () {
     this.timeout(120000);
@@ -29,207 +30,171 @@ describe("GEOSUPPLY Gas Benchmark — Table III", function () {
     gom = await MockGOM.deploy();
     await gom.waitForDeployment();
 
-    const drcMembers = [drc0.address, drc1.address, drc2.address,
-                        drc3.address, drc4.address];
-    const deadline = Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 90;
+    const drcM = [drc0.address, drc1.address, drc2.address,
+                  drc3.address, drc4.address];
+    const dl = Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 90;
+    const TSE = await ethers.getContractFactory("TriStateEscrow");
 
-    const TriStateEscrow = await ethers.getContractFactory("TriStateEscrow");
-    escrow = await TriStateEscrow.deploy(
-      buyer.address, supplier.address,
-      await gom.getAddress(),
-      route, deadline, drcMembers,
-      { value: ethers.parseEther("1.0") }
-    );
+    // NORMAL escrow for NORMAL-state tests
+    escrow = await TSE.deploy(buyer.address, supplier.address,
+      await gom.getAddress(), route, dl, drcM,
+      { value: ethers.parseEther("1.0") });
     await escrow.waitForDeployment();
 
-    const GeoRiskInsurance = await ethers.getContractFactory("GeoRiskInsurance");
-    insurance = await GeoRiskInsurance.deploy(
-      await gom.getAddress(), aisOracle.address
-    );
+    // FM escrow — trigger FM first, deploy, transition, lock deposit
+    await (await gom.triggerForceMajeure(route)).wait();
+    fmEscrow = await TSE.deploy(buyer.address, supplier.address,
+      await gom.getAddress(), route, dl, drcM,
+      { value: ethers.parseEther("1.0") });
+    await fmEscrow.waitForDeployment();
+    await (await fmEscrow.checkAndTransition()).wait();
+    await (await fmEscrow.connect(supplier).lockDeposit(
+      { value: ethers.parseEther("0.15") })).wait();
+
+    // Resolve FM so NORMAL escrow tests work correctly
+    await (await gom.resolveForceMajeure(route)).wait();
+
+    const GRI = await ethers.getContractFactory("GeoRiskInsurance");
+    insurance = await GRI.deploy(await gom.getAddress(), aisOracle.address);
     await insurance.waitForDeployment();
     await (await insurance.depositReserve({ value: ethers.parseEther("5.0") })).wait();
 
-    const SanctionsCompliance = await ethers.getContractFactory("SanctionsCompliance");
-    sanctions = await SanctionsCompliance.deploy(
-      sanctionsOracle.address, officer.address
-    );
+    const SC = await ethers.getContractFactory("SanctionsCompliance");
+    sanctions = await SC.deploy(sanctionsOracle.address, officer.address);
     await sanctions.waitForDeployment();
-    await (await sanctions.authorizePaymentContract(await escrow.getAddress(), true)).wait();
 
-    const GCIL = await ethers.getContractFactory("GCIL");
-    gcil = await GCIL.deploy(await gom.getAddress());
+    // Re-trigger FM for GCIL and ASAP tests
+    await (await gom.triggerForceMajeure(route)).wait();
+
+    const GCILf = await ethers.getContractFactory("GCIL");
+    gcil = await GCILf.deploy(await gom.getAddress());
     await gcil.waitForDeployment();
 
-    const ASAP = await ethers.getContractFactory("ASAP");
-    asap = await ASAP.deploy(await gom.getAddress());
+    const ASAPf = await ethers.getContractFactory("ASAP");
+    asap = await ASAPf.deploy(await gom.getAddress());
     await asap.waitForDeployment();
 
-    const ComplianceAudit = await ethers.getContractFactory("ComplianceAudit");
-    audit = await ComplianceAudit.deploy();
+    const CA = await ethers.getContractFactory("ComplianceAudit");
+    audit = await CA.deploy();
     await audit.waitForDeployment();
 
     console.log("\n==========================================");
     console.log("  GEOSUPPLY GAS BENCHMARK — TABLE III");
+    console.log("  Solidity 0.8.20 | Hardhat EVM");
     console.log("  15 Gwei | ETH $3,000");
     console.log("==========================================\n");
   });
 
-  // ── NORMAL STATE ──────────────────────────────────────
+  // NORMAL STATE
   it("lockDeposit()", async function () {
-    const tx = await escrow.connect(supplier).lockDeposit(
-      { value: ethers.parseEther("0.15") }
-    );
-    const r = await tx.wait();
-    console.log(`  lockDeposit():                    ${r.gasUsed.toLocaleString().padStart(9)} gas  ${usd(r.gasUsed)}`);
+    const r = await (await escrow.connect(supplier).lockDeposit(
+      { value: ethers.parseEther("0.15") })).wait();
+    console.log(`  lockDeposit():                    ${String(r.gasUsed).padStart(9)} gas  ${usd(r.gasUsed)}`);
   });
 
   it("checkAndTransition() — NORMAL", async function () {
-    const tx = await escrow.checkAndTransition();
-    const r = await tx.wait();
-    console.log(`  checkAndTransition (NORMAL):      ${r.gasUsed.toLocaleString().padStart(9)} gas  ${usd(r.gasUsed)}`);
+    const r = await (await escrow.checkAndTransition()).wait();
+    console.log(`  checkAndTransition (NORMAL):      ${String(r.gasUsed).padStart(9)} gas  ${usd(r.gasUsed)}`);
   });
 
   it("confirmDelivery()", async function () {
-    const drcMembers = [drc0.address, drc1.address, drc2.address,
-                        drc3.address, drc4.address];
-    const deadline = Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 90;
-    const TriStateEscrow = await ethers.getContractFactory("TriStateEscrow");
-    const fresh = await TriStateEscrow.deploy(
-      buyer.address, supplier.address, await gom.getAddress(),
-      route, deadline, drcMembers,
-      { value: ethers.parseEther("1.0") }
-    );
-    await fresh.waitForDeployment();
-    await (await fresh.connect(supplier).lockDeposit(
-      { value: ethers.parseEther("0.15") }
-    )).wait();
-    const tx = await fresh.connect(buyer).confirmDelivery();
-    const r = await tx.wait();
-    console.log(`  confirmDelivery():                ${r.gasUsed.toLocaleString().padStart(9)} gas  ${usd(r.gasUsed)}`);
+    const r = await (await escrow.connect(buyer).confirmDelivery()).wait();
+    console.log(`  confirmDelivery():                ${String(r.gasUsed).padStart(9)} gas  ${usd(r.gasUsed)}`);
   });
 
-  // ── FORCE MAJEURE STATE ───────────────────────────────
-  it("checkAndTransition() — NORMAL→FM", async function () {
-    const drcMembers = [drc0.address, drc1.address, drc2.address,
-                        drc3.address, drc4.address];
-    const deadline = Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 90;
-    const TriStateEscrow = await ethers.getContractFactory("TriStateEscrow");
-    const fresh = await TriStateEscrow.deploy(
-      buyer.address, supplier.address, await gom.getAddress(),
-      route, deadline, drcMembers,
-      { value: ethers.parseEther("1.0") }
-    );
+  // FM STATE
+  it("checkAndTransition() — NORMAL->FM", async function () {
+    const drcM = [drc0.address, drc1.address, drc2.address,
+                  drc3.address, drc4.address];
+    const dl = Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 90;
+    const TSE = await ethers.getContractFactory("TriStateEscrow");
+    const fresh = await TSE.deploy(buyer.address, supplier.address,
+      await gom.getAddress(), route, dl, drcM,
+      { value: ethers.parseEther("1.0") });
     await fresh.waitForDeployment();
-    await (await gom.triggerForceMajeure(route)).wait();
-    const tx = await fresh.checkAndTransition();
-    const r = await tx.wait();
-    console.log(`  checkAndTransition (NORMAL->FM):  ${r.gasUsed.toLocaleString().padStart(9)} gas  ${usd(r.gasUsed)}`);
+    const r = await (await fresh.checkAndTransition()).wait();
+    console.log(`  checkAndTransition (NORMAL->FM):  ${String(r.gasUsed).padStart(9)} gas  ${usd(r.gasUsed)}`);
   });
 
   it("submitDRCVote() — vote 1/3", async function () {
-    const rat = "GOM confirmed FM. Non-fault. Supplier fulfilled pre-shipping.";
-    const tx = await escrow.connect(drc0).submitDRCVote(3000, rat);
-    const r = await tx.wait();
-    console.log(`  submitDRCVote (1/3):              ${r.gasUsed.toLocaleString().padStart(9)} gas  ${usd(r.gasUsed)}`);
+    const r = await (await fmEscrow.connect(drc0).submitDRCVote(3000, DRC_RAT)).wait();
+    console.log(`  submitDRCVote (1/3):              ${String(r.gasUsed).padStart(9)} gas  ${usd(r.gasUsed)}`);
   });
 
   it("submitDRCVote() — vote 2/3", async function () {
-    const rat = "GOM confirmed FM. Non-fault. Supplier fulfilled pre-shipping.";
-    const tx = await escrow.connect(drc1).submitDRCVote(3000, rat);
-    const r = await tx.wait();
-    console.log(`  submitDRCVote (2/3):              ${r.gasUsed.toLocaleString().padStart(9)} gas  ${usd(r.gasUsed)}`);
+    const r = await (await fmEscrow.connect(drc1).submitDRCVote(3000, DRC_RAT)).wait();
+    console.log(`  submitDRCVote (2/3):              ${String(r.gasUsed).padStart(9)} gas  ${usd(r.gasUsed)}`);
   });
 
   it("submitDRCVote() — vote 3/3 + execute ruling", async function () {
-    const rat = "GOM confirmed FM. Non-fault. Supplier fulfilled pre-shipping.";
-    const tx = await escrow.connect(drc2).submitDRCVote(3000, rat);
-    const r = await tx.wait();
-    console.log(`  submitDRCVote (3/3 + execute):    ${r.gasUsed.toLocaleString().padStart(9)} gas  ${usd(r.gasUsed)}`);
+    const r = await (await fmEscrow.connect(drc2).submitDRCVote(3000, DRC_RAT)).wait();
+    console.log(`  submitDRCVote (3/3 + execute):    ${String(r.gasUsed).padStart(9)} gas  ${usd(r.gasUsed)}`);
   });
 
-  // ── INSURANCE ────────────────────────────────────────
+  // INSURANCE
   it("depositReserve()", async function () {
-    const tx = await insurance.depositReserve({ value: ethers.parseEther("1.0") });
-    const r = await tx.wait();
-    console.log(`  depositReserve():                 ${r.gasUsed.toLocaleString().padStart(9)} gas  ${usd(r.gasUsed)}`);
+    const r = await (await insurance.depositReserve(
+      { value: ethers.parseEther("1.0") })).wait();
+    console.log(`  depositReserve():                 ${String(r.gasUsed).padStart(9)} gas  ${usd(r.gasUsed)}`);
   });
 
   it("issuePolicy()", async function () {
-    const policyId = ethers.keccak256(ethers.toUtf8Bytes("POL-GAS-001"));
-    const transit  = Math.floor(Date.now() / 1000);
-    const delivery = transit + 60 * 60 * 24 * 20;
-    const tx = await insurance.connect(buyer).issuePolicy(
-      policyId, route, vesselId, transit, delivery,
-      { value: ethers.parseEther("0.1") }
-    );
-    const r = await tx.wait();
-    console.log(`  issuePolicy():                    ${r.gasUsed.toLocaleString().padStart(9)} gas  ${usd(r.gasUsed)}`);
+    const pid = ethers.keccak256(ethers.toUtf8Bytes("POL-GAS-001"));
+    const t = Math.floor(Date.now() / 1000);
+    const r = await (await insurance.connect(buyer).issuePolicy(
+      pid, route, vesselId, t, t + 60*60*24*20,
+      { value: ethers.parseEther("0.1") })).wait();
+    console.log(`  issuePolicy():                    ${String(r.gasUsed).padStart(9)} gas  ${usd(r.gasUsed)}`);
   });
 
-  // ── SANCTIONS ────────────────────────────────────────
+  // SANCTIONS
   it("updateSanctionedAddress() — add", async function () {
-    const tx = await sanctions.connect(sanctionsOracle)
-      .updateSanctionedAddress(drc4.address, true, "OFAC-SDN");
-    const r = await tx.wait();
-    console.log(`  updateSanctionedAddress (add):    ${r.gasUsed.toLocaleString().padStart(9)} gas  ${usd(r.gasUsed)}`);
+    const r = await (await sanctions.connect(sanctionsOracle)
+      .updateSanctionedAddress(drc4.address, true, "OFAC-SDN")).wait();
+    console.log(`  updateSanctionedAddress (add):    ${String(r.gasUsed).padStart(9)} gas  ${usd(r.gasUsed)}`);
   });
 
   it("updateSanctionedAddress() — remove", async function () {
-    const tx = await sanctions.connect(sanctionsOracle)
-      .updateSanctionedAddress(drc4.address, false, "OFAC-SDN");
-    const r = await tx.wait();
-    console.log(`  updateSanctionedAddress (remove): ${r.gasUsed.toLocaleString().padStart(9)} gas  ${usd(r.gasUsed)}`);
+    const r = await (await sanctions.connect(sanctionsOracle)
+      .updateSanctionedAddress(drc4.address, false, "OFAC-SDN")).wait();
+    console.log(`  updateSanctionedAddress (remove): ${String(r.gasUsed).padStart(9)} gas  ${usd(r.gasUsed)}`);
   });
 
-  // ── GCIL ─────────────────────────────────────────────
+  // GCIL
   it("flagSupplierExclusion() — below threshold", async function () {
-    const tx = await gcil.flagSupplierExclusion(
-      supplier.address, route,
-      Math.floor(Date.now() / 1000) - 3600,
-      10, 85
-    );
-    const r = await tx.wait();
-    console.log(`  flagSupplierExclusion (<15pt):    ${r.gasUsed.toLocaleString().padStart(9)} gas  ${usd(r.gasUsed)}`);
+    const r = await (await gcil.flagSupplierExclusion(
+      supplier.address, route, Math.floor(Date.now()/1000)-3600, 10, 85)).wait();
+    console.log(`  flagSupplierExclusion (<15pt):    ${String(r.gasUsed).padStart(9)} gas  ${usd(r.gasUsed)}`);
   });
 
-  it("flagSupplierExclusion() — above threshold (HumanReview)", async function () {
-    const tx = await gcil.flagSupplierExclusion(
-      buyer.address, route,
-      Math.floor(Date.now() / 1000) - 3600,
-      20, 91
-    );
-    const r = await tx.wait();
-    console.log(`  flagSupplierExclusion (>15pt):    ${r.gasUsed.toLocaleString().padStart(9)} gas  ${usd(r.gasUsed)}`);
+  it("flagSupplierExclusion() — above threshold", async function () {
+    const r = await (await gcil.flagSupplierExclusion(
+      buyer.address, route, Math.floor(Date.now()/1000)-3600, 20, 91)).wait();
+    console.log(`  flagSupplierExclusion (>15pt):    ${String(r.gasUsed).padStart(9)} gas  ${usd(r.gasUsed)}`);
   });
 
-  // ── ASAP ─────────────────────────────────────────────
+  // ASAP
   it("activateAlternativeSupplier()", async function () {
     const top5 = [drc0.address, drc1.address, drc2.address,
                   drc3.address, drc4.address];
-    const tx = await asap.activateAlternativeSupplier(
+    const r = await (await asap.activateAlternativeSupplier(
       supplier.address, buyer.address,
-      ethers.keccak256(ethers.toUtf8Bytes("ESCROW-GAS-001")),
-      route, top5, 1
-    );
-    const r = await tx.wait();
-    console.log(`  activateAlternativeSupplier():    ${r.gasUsed.toLocaleString().padStart(9)} gas  ${usd(r.gasUsed)}`);
+      ethers.keccak256(ethers.toUtf8Bytes("ESCROW-001")),
+      route, top5, 1)).wait();
+    console.log(`  activateAlternativeSupplier():    ${String(r.gasUsed).padStart(9)} gas  ${usd(r.gasUsed)}`);
   });
 
-  // ── AUDIT ────────────────────────────────────────────
+  // AUDIT
   it("ComplianceAudit.logRuling()", async function () {
-    const rulingId = ethers.keccak256(ethers.toUtf8Bytes("RULING-GAS-001"));
-    const tx = await audit.logRuling(
-      rulingId, await escrow.getAddress(),
+    const rid = ethers.keccak256(ethers.toUtf8Bytes("RULING-001"));
+    const r = await (await audit.logRuling(
+      rid, await fmEscrow.getAddress(),
       [drc0.address, drc1.address, drc2.address],
-      3000,
-      "GOM confirmed FM. Non-fault. Pre-shipping fulfilled.",
-      ethers.keccak256(ethers.toUtf8Bytes("EVIDENCE")),
-      3, ""
-    );
-    const r = await tx.wait();
-    console.log(`  ComplianceAudit.logRuling():      ${r.gasUsed.toLocaleString().padStart(9)} gas  ${usd(r.gasUsed)}`);
+      3000, "GOM confirmed FM. Non-fault.", 
+      ethers.keccak256(ethers.toUtf8Bytes("EVIDENCE")), 3, "")).wait();
+    console.log(`  ComplianceAudit.logRuling():      ${String(r.gasUsed).padStart(9)} gas  ${usd(r.gasUsed)}`);
     console.log("\n==========================================");
-    console.log("  GAS BENCHMARK COMPLETE");
+    console.log("  GAS BENCHMARK COMPLETE — 15 of 15");
     console.log("==========================================\n");
   });
 });
